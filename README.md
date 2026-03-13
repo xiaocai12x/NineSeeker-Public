@@ -1,6 +1,6 @@
 # NineSeek · Unity 2D 可复用系统
 
-![Unity Version](https://img.shields.io/badge/Unity-2021.3%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Unity Version](https://img.shields.io/badge/Unity-6%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
 本仓库包含两套独立可复用的系统：**死亡重生管线 (DeathFlow)** 与 **程序化头发系统 (Procedural Hair)**。点击下方标题展开对应教程。
 
