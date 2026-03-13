@@ -41,9 +41,7 @@
 2. 重写四个阶段的协程逻辑。
 3. 添加 `[CreateAssetMenu]`，在编辑器中右键创建策略资产。
 4. 将资产拖到对应机关（如毒水池）的 Inspector。完成！
-
-详细架构与 API 见 [docs/DeathStrategy.md](docs/DeathStrategy.md)。
-
+   
 </details>
 
 ---
@@ -116,8 +114,6 @@ main.startColor = hairController.CurrentHairColor;            // 死亡粒子取
 * **主发团 / 尾巴**：在 Inspector 中为 MeshRenderer 手动指定 URP Sprite Unlit Shader（或 HairController 的 `hairShader` 字段），避免依赖 `Shader.Find` 在 Build 中被裁掉。
 * **刘海**：将 `Bangs_Luminance_Sync.shader` 加入 **Always Included Shaders**，防止打包丢失。
 * 脚本已对 Linear 颜色空间做 `.linear` 处理，一般无需额外 Gamma 转换。
-
-详细说明见 [docs/Hair/README.md](docs/Hair/README.md)。
 
 </details>
 
