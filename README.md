@@ -1,138 +1,126 @@
-# Celeste-Style Procedural Hair for Unity 2D
+# NineSeek · Unity 2D 可复用系统
 
-# 类蔚蓝风格程序化头发 · Unity 2D
+![Unity Version](https://img.shields.io/badge/Unity-2021.3%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
-Procedural hair system for Unity 2D: chain physics, per-frame mesh generation, state-driven color. Main hair + optional bangs (sprite) and tail (mesh). Single source of truth for color; no sprite animation required for the main hair.
-
-Unity 2D 程序化头发：链式物理、每帧生成 Mesh、状态驱动发色。主发团 + 可选刘海（Sprite）与猫尾（Mesh）。颜色单一来源，主发团无需序列帧。
+本仓库包含两套独立可复用的系统：**死亡重生管线 (DeathFlow)** 与 **程序化头发系统 (Procedural Hair)**。点击下方标题展开对应教程。
 
 ---
 
-## 开源说明 / Open Source
+<details>
+<summary><strong>💀 DeathFlow：像《蔚蓝》一样丝滑的死亡重生管线</strong></summary>
 
-### 中文
+在硬核平台跳跃游戏中，死亡不应是挫败，而应是极低成本的试错。
+通过 **策略模式 (Strategy Pattern)** 与 **事件解耦 (Pub-Sub)**，将角色的“死与生”封装为一段高度可定制的生命周期。让你在不写一行 `if-else` 屎山的前提下，轻松实现极其丝滑、0.5 秒极速复位、且死法各异的游戏体验。
 
-- 本仓库中的 Hair 相关代码（`HairController.cs`、`HairBangsController.cs`、`TailController.cs`）可自由用于个人或商业项目。
-- 使用或参考时欢迎注明来源或致谢，但非强制。
-- 代码按「现状」提供，不提供任何明示或暗示的保证；使用带来的风险由使用者自行承担。
-- 若你基于本实现做了改进并开源，欢迎保留本说明或注明衍生关系。
+### ✨ 核心特性
 
-### English
+* **⏱️ 极速复位**：从死亡到重生仅需约 0.5 秒，肌肉记忆不中断。
+* **🎨 表现解耦**：基于 `ScriptableObject` 的策略资产，掉坑、被刺、挤压… 不同死法独立配置，策划可在 Inspector 中即插即用。
+* **🔌 事件驱动**：Player 仅负责广播 `OnPlayerDied` 事件，复活流程交由 `DeathRespawnManager` 统一编排，彻底解耦。
+* **⚡ 零实例化**：复活过程不切场景、不 `Instantiate` 新角色，纯粹基于状态与物理重置，性能开销极低。
 
-- The Hair-related code in this repository (`HairController.cs`, `HairBangsController.cs`, `TailController.cs`) may be used freely in personal or commercial projects.
-- Attribution or credit is appreciated but not required.
-- The code is provided "as is" without warranty of any kind; use at your own risk.
-- If you fork or adapt this implementation and open-source it, you may keep this notice or credit the original source.
+### 🏗️ 架构概览：四角色生命周期
 
----
+1. **凶手 (Hazard/Level)**：关卡内的致死机关，触发死亡并传递「死亡剧本 (DeathStrategy)」。
+2. **受害者 (PlayerController)**：受到致命伤后广播静态事件，关闭自身物理交互，等待复活。
+3. **导演 (DeathRespawnManager)**：订阅死亡事件，编排四阶段流程（死 → 黑屏转场 → 移动 → 亮屏复活）。
+4. **剧本 (DeathStrategy)**：策略资产，定义各阶段的具体特效、音效与动画。
 
-## 使用教程 / Usage Guide
+### 🚀 核心流程 (The 4-Stage Death Flow)
 
-### 1. 需求 / Requirements
+| 阶段 | 方法名 | 职责描述 |
+| :--- | :--- | :--- |
+| **1. 死亡演出** | `ExecuteDeath()` | 物理定格、受击特效/音效、顿帧 (HitStop)。 |
+| **2. 屏幕转场** | `TransitionIn()` | 屏幕拉黑（如 Iris 材质收缩），遮蔽视野。 |
+| **3. 复活准备** | `ExecuteRespawn()` | 位置与速度已由 Manager 在本阶段前重置至 Checkpoint；策略只做复活准备（如缩放/表现）并**保持隐身**。 |
+| **4. 真正复活** | `TransitionOut()` | 屏幕亮起，聚拢特效，调用 `ReviveInternal()` 恢复控制权并重置状态机、体力、碰撞等。 |
 
-| 需求 / Requirement | 说明 / Description |
-|--------------------|---------------------|
-| Unity | 推荐 2021.3+，需支持 URP 2D / 2D Renderer |
-| 玩家脚本 | 你的玩家需提供：朝向、是否死亡、状态机（如 Crouch/Dash）、体力与可冲刺判断、Visuals 根节点 |
-| 锚点 | 主发团/刘海/尾巴需要两个 Transform（左/右发根），通常由动画机 K 帧驱动 |
+### 🛠️ 如何扩展一种新的死亡表现？
 
-Your player script must expose: facing direction, IsDead, state machine (e.g. CrouchState, DashState), stamina / "can dash" check, and a Visuals root Transform. The hair/tail need anchor Transforms (left/right), typically driven by the Animator.
+1. 新建 C# 脚本，继承 `DeathStrategy`。
+2. 重写四个阶段的协程逻辑。
+3. 添加 `[CreateAssetMenu]`，在编辑器中右键创建策略资产。
+4. 将资产拖到对应机关（如毒水池）的 Inspector。完成！
 
----
+详细架构与 API 见 [docs/DeathStrategy.md](docs/DeathStrategy.md)。
 
-### 2. 快速开始 / Quick Start
-
-**中文**
-
-1. 将本仓库中的三个脚本复制到你的项目中（例如 `Assets/Scripts/Player/Hair/`）。
-2. 若你的玩家类不叫 `PlayerController`，在 `HairController`、`HairBangsController`、`TailController` 中把 `PlayerController` 的引用改为你的玩家类，或抽成接口后注入。
-3. 在场景中创建三个空物体，分别挂载主发团、刘海、尾巴的组件，并按下方「场景设置」连线。
-
-**English**
-
-1. Copy the three scripts from this repo into your project (e.g. `Assets/Scripts/Player/Hair/`).
-2. If your player class has a different name, replace `PlayerController` references in the three scripts with your class, or introduce an interface and inject it.
-3. Create three GameObjects in the scene, add the main hair / bangs / tail components, and wire them as in "Scene Setup" below.
+</details>
 
 ---
 
-### 3. 场景设置 / Scene Setup
+<details>
+<summary><strong>🍓 Celeste-Style 程序化头发系统 (Procedural Hair)</strong></summary>
 
-**主发团 Main hair**
+类蔚蓝风格程序化头发系统 · Unity 2D。链式物理、每帧 Mesh 生成、状态驱动发色同步。**主发团无需任何序列帧动画。**
 
-- 空物体 + **MeshFilter** + **MeshRenderer** + **HairController**。
-- 在 HairController 上指定：
-  - **Hair Anchor Right / Left**：两个发根锚点（通常挂在角色骨骼/Visuals 下，由动画 K 帧）。
-  - **Hair Circle Sprite**（可选）：8×8 像素圆，用作 Mesh 纹理。
-  - **Accessory Renderers**（可选）：需要跟发色同步的 SpriteRenderer（如耳朵）拖入。
-- 在 Inspector 中为 MeshRenderer 指定 **URP 2D Sprite Unlit** 类 Shader（或手动指定 `hairShader`），避免 Build 时被剥离。
+### ✨ 核心特性
 
-**刘海 Bangs**
+* **⛓️ 链式物理计算**：主发团与尾巴基于物理节点跟随，运动丝滑。
+* **🎨 颜色单一数据源**：发色由当前状态（冲刺、无体力等）驱动，刘海、尾巴、耳朵等挂件自动同步主发色，无需 K 帧变色动画。
+* **🧩 高度模块化**：主发团 (Main Hair)、刘海 (Bangs)、尾巴 (Tail) 可独立拆装。
+* **⚡ 易扩展**：内置 `WarpNodes` 解决传送拉丝，`OnRefill` 兼容体力恢复/吃草莓特效。
 
-- 带 **SpriteRenderer** 的物体 + **HairBangsController**。
-- 指定 **Hair Master** = 主发团的 HairController。
-- 指定 **Hair Anchor Right / Left**（可与主发团共用）。
-- 配置 **Sprite Mapping**：`animationKeyword`（玩家当前动画精灵名包含的关键字）→ `bangsSprite`；未匹配时使用 **Default Bangs**。
-- 若使用自定义 Shader（如 `Custom/Bangs_Luminance_Sync`），需在 Build 中保留该 Shader。
+### 📜 开源说明
 
-**尾巴 Tail**
+**[CN]** 本仓库中的 Hair 相关代码（`HairController`、`HairBangsController`、`TailController`）可自由用于个人或商业项目。使用或参考时欢迎注明来源，非强制。代码按「现状」提供，风险自负。若衍生开源，欢迎保留本说明。  
+**[EN]** Hair-related code may be used freely in personal or commercial projects. Attribution appreciated but not required. Provided "as is" without warranty.
 
-- 空物体 + **MeshFilter** + **MeshRenderer** + **TailController**。
-- 指定 **Tail Anchor Right / Left**、**Hair Master**、贴图（如 8×8 圆）、段数/半径/物理参数等。
-- 可选 **Use Darken Effect** + **Darken Multiplier** 使尾巴略深于发色。
+### 🛠️ 核心模块与文件
 
----
+| 文件 | 职责 |
+| --- | --- |
+| **`HairController.cs`** | 主发团：链式物理、Mesh 生成、颜色主控、挂件同步。对外提供 `WarpNodes`、`OnRefill`、`CurrentHairColor`、`GetPulseScale`。 |
+| **`HairBangsController.cs`** | 刘海：锚点跟随、按动画关键字切换贴图、从主发团同步颜色与压扁。 |
+| **`TailController.cs`** | 猫尾：独立链式物理与 Mesh，从主发团同步颜色（可配置 `Use Darken Effect` / `Darken Multiplier`）。 |
 
-### 4. 接入游戏逻辑 / Integration
+### 🚀 场景配置指南
 
-脚本中供外部调用的接口集中在 **HairController** 的 `#region 供外部调用` 中：
+**前置**：Unity 2021.3+，URP 2D。玩家需提供朝向、IsDead、状态机、体力、Visuals 根节点；动画骨骼下需有左/右发根锚点。
 
-| 接口 API | 说明 Description |
-|----------|------------------|
-| `WarpNodes(Vector3 position)` | 将所有头发节点瞬移到指定世界坐标并刷新 Mesh。用于**重生/传送**时避免拉丝。 |
-| `OnRefill()` | 触发补给闪光与脉冲。在**体力回复/补给**时调用。 |
-| `CurrentHairColor` | 只读，当前插值后的发色。供尾巴、刘海、挂件、**死亡特效**等读取。 |
-| `GetPulseScale()` | 只读，当前脉冲缩放。供 UI 等同步表现。 |
+**主发团**
 
-**调用示例 / Example**
+* 空物体 + `MeshFilter` + `MeshRenderer` + `HairController`。
+* 设置 **Hair Anchor Right / Left**，**Hair Circle Sprite**（8×8 像素圆），**Accessory Renderers**（需同步发色的 SpriteRenderer，如兽耳）。
+* MeshRenderer 指定 **URP 2D Sprite Unlit**（或 `Universal Render Pipeline/2D/Sprite-Unlit-Default`），避免 Build 剥离。
 
-- 重生时：`hair.WarpNodes(player.Visuals.transform.position);`
-- 回体力时：`hair.OnRefill();`
-- 死亡特效取色：`var color = player.GetComponentInChildren<HairController>()?.CurrentHairColor;`
+**刘海**
 
----
+* 物体 + `SpriteRenderer` + `HairBangsController`。**Hair Master** 指向主发团。
+* **Sprite Mapping**：配置 `animationKeyword` → `bangsSprite`，未匹配时用 **Default Bangs**。
+* 使用自定义 Shader `Custom/Bangs_Luminance_Sync`（见 `Assets/Shader/Bangs_Luminance_Sync.shader`），打包时请在 **Project Settings → Graphics → Always Included Shaders** 中加入该 Shader。
 
-### 5. Build 注意 / Build Notes
+**尾巴（可选）**
 
-- **Hair**：在 Inspector 中为 HairController 指定 **hairShader**（URP 2D Sprite Unlit），避免依赖 `Shader.Find` 在 Build 中被裁掉。
-- **Tail**：当前脚本内使用 `Shader.Find`，若 Build 后尾巴不显示（颜色丢失），可改为 SerializeField 暴露 Shader 并在 Inspector 中指定。
-- **Linear 空间**：若 Project 使用 Linear Color Space，脚本已对发色做 `.linear` 再写入 Mesh/挂件，一般无需额外处理。
-- **刘海 Shader**：若使用自定义 Shader，请在 Project Settings → Graphics 或 Shader  stripping 中确保该 Shader 被包含。
+* 空物体 + `MeshFilter` + `MeshRenderer` + `TailController`。指定 **Tail Anchor Right / Left**、**Hair Master**。
+* 勾选 **Use Darken Effect**、调节 **Darken Multiplier** 可让尾巴略深于发色。
 
----
+### 🔌 核心 API (HairController)
 
-### 6. 文件清单 / File List
+| API | 用途 |
+| --- | --- |
+| `WarpNodes(Vector3 position)` | 重生/传送时调用，瞬移所有头发节点，防止拉丝。 |
+| `OnRefill()` | 体力恢复/吃补给时调用，触发白光闪烁与缩放脉冲。 |
+| `CurrentHairColor` | 只读，当前插值发色。供死亡特效、UI 等读取。 |
+| `GetPulseScale()` | 只读，当前脉冲缩放。供外部动画同步。 |
 
-| 文件 File | 职责 Role |
-|-----------|-----------|
-| `HairController.cs` | 主发团：链式物理、Mesh 生成、颜色主控、挂件同步；对外提供 WarpNodes、OnRefill、CurrentHairColor、GetPulseScale。 |
-| `HairBangsController.cs` | 刘海：锚点跟随、按动画关键字切换贴图、压扁、从 Hair 同步颜色。 |
-| `TailController.cs` | 猫尾：独立链式物理与 Mesh，从 Hair 同步颜色（可加深）。 |
+**示例**
 
----
+```csharp
+hairController.WarpNodes(player.Visuals.transform.position);  // 重生
+hairController.OnRefill();                                    // 回体力
+main.startColor = hairController.CurrentHairColor;            // 死亡粒子取色
+```
 
-### 7. 打包需包含的 Shader / Shaders to Include When Packaging
+### ⚠️ 打包注意
 
-**中文**
+* **主发团 / 尾巴**：在 Inspector 中为 MeshRenderer 手动指定 URP Sprite Unlit Shader（或 HairController 的 `hairShader` 字段），避免依赖 `Shader.Find` 在 Build 中被裁掉。
+* **刘海**：将 `Bangs_Luminance_Sync.shader` 加入 **Always Included Shaders**，防止打包丢失。
+* 脚本已对 Linear 颜色空间做 `.linear` 处理，一般无需额外 Gamma 转换。
 
-- **需要随仓库提供的**：**`Bangs_Luminance_Sync.shader`**（建议路径：`Assets/Shader/Bangs_Luminance_Sync.shader`）。刘海通过 `Shader.Find("Custom/Bangs_Luminance_Sync")` 使用该 Shader；若不包含此文件，他人克隆后刘海会找不到 Shader，显示异常。
-- **不需要打包的**：主发团与尾巴使用的 `Universal Render Pipeline/2D/Sprite-Unlit-Default` 为 URP 内置 Shader，用户项目安装 URP 即可；仅在文档中说明在 Inspector 指定该 Shader（或保证 Build 不剥离）即可。
+详细说明见 [docs/Hair/README.md](docs/Hair/README.md)。
 
-**English**
-
-- **Include in repo**: **`Bangs_Luminance_Sync.shader`** (e.g. `Assets/Shader/Bangs_Luminance_Sync.shader`). Bangs use `Shader.Find("Custom/Bangs_Luminance_Sync")`; without this file, the shader will be missing and bangs will not display correctly.
-- **No need to include**: The main hair and tail use URP's built-in `Universal Render Pipeline/2D/Sprite-Unlit-Default`; users only need a project with URP and to assign that shader in Inspector (or ensure it is not stripped in Build).
+</details>
 
 ---
 
-*如有问题或改进建议，欢迎提 Issue 或 PR。*
+*如有问题或改进建议，欢迎提交 Issue 或 PR。*
